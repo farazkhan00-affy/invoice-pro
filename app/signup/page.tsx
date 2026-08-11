@@ -5,9 +5,14 @@ import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { Mail, Lock, User, Eye, EyeOff } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export default function SignupPage() {
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
+  const [form, setForm] = useState({ name: "", email: "", password: "" });
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   return (
     <div className="min-h-screen flex items-center justify-center px-6 bg-[var(--background)] py-12">
@@ -34,7 +39,30 @@ export default function SignupPage() {
             Start managing invoices in minutes
           </p>
 
-          <form className="space-y-4">
+          <form
+            className="space-y-4"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setError("");
+              setLoading(true);
+
+              const res = await fetch("/api/signup", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(form),
+              });
+
+              const data = await res.json();
+              setLoading(false);
+
+              if (!res.ok) {
+                setError(data.error || "Something went wrong");
+                return;
+              }
+
+              router.push("/login");
+            }}
+          >
             {/* Name */}
             <div>
               <label className="text-sm text-[var(--foreground)] mb-1.5 block">Full name</label>
@@ -44,6 +72,8 @@ export default function SignupPage() {
                   type="text"
                   placeholder="Faraz Hussain"
                   required
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
                   className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40 transition-all"
                 />
               </div>
@@ -58,6 +88,8 @@ export default function SignupPage() {
                   type="email"
                   placeholder="you@example.com"
                   required
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
                   className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40 transition-all"
                 />
               </div>
@@ -72,6 +104,9 @@ export default function SignupPage() {
                   type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
                   required
+                  minLength={8}
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
                   className="w-full pl-10 pr-10 py-2.5 rounded-lg border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40 transition-all"
                 />
                 <button
@@ -85,11 +120,16 @@ export default function SignupPage() {
               <p className="text-xs text-[var(--muted)] mt-1.5">At least 8 characters</p>
             </div>
 
+            {error && (
+              <p className="text-sm text-red-500 bg-red-500/10 px-3 py-2 rounded-lg">{error}</p>
+            )}
+
             <button
               type="submit"
-              className="w-full bg-[var(--primary)] text-white py-2.5 rounded-lg font-medium hover:opacity-90 transition-opacity"
+              disabled={loading}
+              className="w-full bg-[var(--primary)] text-white py-2.5 rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-60"
             >
-              Create account
+              {loading ? "Creating account..." : "Create account"}
             </button>
           </form>
 

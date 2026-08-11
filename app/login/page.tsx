@@ -5,9 +5,15 @@ import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 
 export default function LoginPage() {
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
+  const [form, setForm] = useState({ email: "", password: "" });
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   return (
     <div className="min-h-screen flex items-center justify-center px-6 bg-[var(--background)]">
@@ -34,7 +40,29 @@ export default function LoginPage() {
             Log in to manage your invoices
           </p>
 
-          <form className="space-y-4">
+          <form
+            className="space-y-4"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setError("");
+              setLoading(true);
+
+              const res = await signIn("credentials", {
+                email: form.email,
+                password: form.password,
+                redirect: false,
+              });
+
+              setLoading(false);
+
+              if (res?.error) {
+                setError("Invalid email or password");
+                return;
+              }
+
+              router.push("/dashboard");
+            }}
+          >
             {/* Email */}
             <div>
               <label className="text-sm text-[var(--foreground)] mb-1.5 block">Email</label>
@@ -44,6 +72,8 @@ export default function LoginPage() {
                   type="email"
                   placeholder="you@example.com"
                   required
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
                   className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40 transition-all"
                 />
               </div>
@@ -63,6 +93,8 @@ export default function LoginPage() {
                   type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
                   required
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
                   className="w-full pl-10 pr-10 py-2.5 rounded-lg border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40 transition-all"
                 />
                 <button
@@ -75,11 +107,16 @@ export default function LoginPage() {
               </div>
             </div>
 
+            {error && (
+              <p className="text-sm text-red-500 bg-red-500/10 px-3 py-2 rounded-lg">{error}</p>
+            )}
+
             <button
               type="submit"
-              className="w-full bg-[var(--primary)] text-white py-2.5 rounded-lg font-medium hover:opacity-90 transition-opacity"
+              disabled={loading}
+              className="w-full bg-[var(--primary)] text-white py-2.5 rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-60"
             >
-              Log in
+              {loading ? "Logging in..." : "Log in"}
             </button>
           </form>
 

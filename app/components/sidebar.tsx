@@ -11,7 +11,9 @@ import {
   BarChart3,
   Settings,
   X,
+  LogOut,
 } from "lucide-react";
+import { signOut } from "next-auth/react";
 
 const navItems = [
   { label: "Overview", href: "/dashboard", icon: LayoutDashboard },
@@ -64,6 +66,13 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
           </span>
         </Link>
         <NavLinks />
+        <button
+          onClick={() => signOut({ callbackUrl: "/" })}
+          className="flex items-center gap-3 mx-3 px-3 py-2.5 rounded-lg text-sm font-medium text-[var(--muted)] hover:bg-red-500/10 hover:text-red-500 transition-colors"
+        >
+          <LogOut size={18} />
+          Log out
+        </button>
       </aside>
 
       {/* Mobile sidebar - slide-in drawer */}
@@ -97,6 +106,13 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
                 </button>
               </div>
               <NavLinks />
+              <button
+                onClick={() => signOut({ callbackUrl: "/" })}
+                className="flex items-center gap-3 mx-3 px-3 py-2.5 rounded-lg text-sm font-medium text-[var(--muted)] hover:bg-red-500/10 hover:text-red-500 transition-colors"
+              >
+                <LogOut size={18} />
+                Log out
+              </button>
             </motion.aside>
           </>
         )}

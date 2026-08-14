@@ -1,22 +1,26 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { DollarSign, FileText, Users, Clock, ArrowUpRight, Plus } from "lucide-react";
+import { DollarSign, FileText, Users, Clock, ArrowUpRight, Plus, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 
-const stats = [
-  { label: "Total Revenue", value: "$24,580", change: "+12.5%", icon: DollarSign },
-  { label: "Outstanding", value: "$3,240", change: "5 invoices", icon: Clock },
-  { label: "Total Clients", value: "18", change: "+2 this month", icon: Users },
-  { label: "Invoices Sent", value: "47", change: "+8 this month", icon: FileText },
-];
-
-const recentInvoices = [
-  { id: "INV-0047", client: "Acme Corp", amount: "$1,200", status: "Paid", date: "Aug 8" },
-  { id: "INV-0046", client: "Bright Studio", amount: "$850", status: "Pending", date: "Aug 6" },
-  { id: "INV-0045", client: "Nova Tech", amount: "$2,400", status: "Overdue", date: "Jul 29" },
-  { id: "INV-0044", client: "Pixel Labs", amount: "$600", status: "Paid", date: "Jul 25" },
-];
+interface DashboardData {
+  totalRevenue: number;
+  outstanding: number;
+  outstandingCount: number;
+  clientCount: number;
+  invoicesSent: number;
+  recentInvoices: {
+    id: string;
+    number: string;
+    client: string;
+    amount: number;
+    status: string;
+    date: string;
+  }[];
+}
 
 const statusStyles: Record<string, string> = {
   Paid: "bg-green-500/10 text-green-500",
@@ -25,12 +29,41 @@ const statusStyles: Record<string, string> = {
 };
 
 export default function DashboardPage() {
+  const { data: session } = useSession();
+  const firstName = session?.user?.name?.split(" ")[0] ?? "there";
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/dashboard")
+      .then((res) => res.json())
+      .then((d) => {
+        setData(d);
+        setLoading(false);
+      });
+  }, []);
+
+  if (loading || !data) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 size={24} className="animate-spin text-[var(--primary)]" />
+      </div>
+    );
+  }
+
+  const stats = [
+    { label: "Total Revenue", value: `$${data.totalRevenue.toFixed(2)}`, change: "From paid invoices", icon: DollarSign },
+    { label: "Outstanding", value: `$${data.outstanding.toFixed(2)}`, change: `${data.outstandingCount} invoices`, icon: Clock },
+    { label: "Total Clients", value: String(data.clientCount), change: "All time", icon: Users },
+    { label: "Invoices Sent", value: String(data.invoicesSent), change: "All time", icon: FileText },
+  ];
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--foreground)]">Welcome back, Faraz</h1>
+          <h1 className="text-2xl font-bold text-[var(--foreground)]">Welcome back, {firstName}</h1>
           <p className="text-sm text-[var(--muted)] mt-1">Here&apos;s what&apos;s happening with your business</p>
         </div>
         <Link
@@ -59,7 +92,7 @@ export default function DashboardPage() {
             </div>
             <p className="text-2xl font-bold text-[var(--foreground)]">{stat.value}</p>
             <p className="text-xs text-[var(--muted)] mt-1">{stat.label}</p>
-            <p className="text-xs text-green-500 mt-2">{stat.change}</p>
+            <p className="text-xs text-[var(--muted)] mt-2">{stat.change}</p>
           </motion.div>
         ))}
       </div>
@@ -78,53 +111,63 @@ export default function DashboardPage() {
           </Link>
         </div>
 
-        {/* Table - desktop */}
-        <div className="hidden sm:block overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-[var(--muted)] border-b border-[var(--border)]">
-                <th className="px-5 py-3 font-medium">Invoice</th>
-                <th className="px-5 py-3 font-medium">Client</th>
-                <th className="px-5 py-3 font-medium">Amount</th>
-                <th className="px-5 py-3 font-medium">Status</th>
-                <th className="px-5 py-3 font-medium">Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentInvoices.map((inv) => (
-                <tr key={inv.id} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--border)]/20 transition-colors">
-                  <td className="px-5 py-3.5 font-medium text-[var(--foreground)]">{inv.id}</td>
-                  <td className="px-5 py-3.5 text-[var(--muted)]">{inv.client}</td>
-                  <td className="px-5 py-3.5 text-[var(--foreground)]">{inv.amount}</td>
-                  <td className="px-5 py-3.5">
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusStyles[inv.status]}`}>
+        {data.recentInvoices.length === 0 ? (
+          <p className="text-center py-10 text-sm text-[var(--muted)]">No invoices yet.</p>
+        ) : (
+          <>
+            {/* Table - desktop */}
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-[var(--muted)] border-b border-[var(--border)]">
+                    <th className="px-5 py-3 font-medium">Invoice</th>
+                    <th className="px-5 py-3 font-medium">Client</th>
+                    <th className="px-5 py-3 font-medium">Amount</th>
+                    <th className="px-5 py-3 font-medium">Status</th>
+                    <th className="px-5 py-3 font-medium">Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.recentInvoices.map((inv) => (
+                    <tr key={inv.id} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--border)]/20 transition-colors">
+                      <td className="px-5 py-3.5 font-medium text-[var(--foreground)]">{inv.number}</td>
+                      <td className="px-5 py-3.5 text-[var(--muted)]">{inv.client}</td>
+                      <td className="px-5 py-3.5 text-[var(--foreground)]">${inv.amount.toFixed(2)}</td>
+                      <td className="px-5 py-3.5">
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusStyles[inv.status]}`}>
+                          {inv.status}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5 text-[var(--muted)]">
+                        {new Date(inv.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Cards - mobile */}
+            <div className="sm:hidden divide-y divide-[var(--border)]">
+              {data.recentInvoices.map((inv) => (
+                <div key={inv.id} className="p-4 flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-[var(--foreground)] text-sm">{inv.number}</p>
+                    <p className="text-xs text-[var(--muted)] mt-0.5">
+                      {inv.client} · {new Date(inv.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-medium text-[var(--foreground)]">${inv.amount.toFixed(2)}</p>
+                    <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${statusStyles[inv.status]}`}>
                       {inv.status}
                     </span>
-                  </td>
-                  <td className="px-5 py-3.5 text-[var(--muted)]">{inv.date}</td>
-                </tr>
+                  </div>
+                </div>
               ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Cards - mobile */}
-        <div className="sm:hidden divide-y divide-[var(--border)]">
-          {recentInvoices.map((inv) => (
-            <div key={inv.id} className="p-4 flex items-center justify-between">
-              <div>
-                <p className="font-medium text-[var(--foreground)] text-sm">{inv.id}</p>
-                <p className="text-xs text-[var(--muted)] mt-0.5">{inv.client} · {inv.date}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm font-medium text-[var(--foreground)]">{inv.amount}</p>
-                <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${statusStyles[inv.status]}`}>
-                  {inv.status}
-                </span>
-              </div>
             </div>
-          ))}
-        </div>
+          </>
+        )}
       </motion.div>
     </div>
   );

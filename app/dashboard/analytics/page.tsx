@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
   LineChart,
@@ -12,34 +13,46 @@ import {
   BarChart,
   Bar,
 } from "recharts";
-import { TrendingUp, DollarSign, Users, AlertCircle } from "lucide-react";
+import { TrendingUp, DollarSign, Users, AlertCircle, Loader2 } from "lucide-react";
 
-const revenueData = [
-  { month: "Feb", revenue: 3200 },
-  { month: "Mar", revenue: 4100 },
-  { month: "Apr", revenue: 3800 },
-  { month: "May", revenue: 5200 },
-  { month: "Jun", revenue: 4900 },
-  { month: "Jul", revenue: 6100 },
-  { month: "Aug", revenue: 5800 },
-];
-
-const topClients = [
-  { name: "Acme Corp", amount: 9600 },
-  { name: "Nova Tech", amount: 7200 },
-  { name: "Bright Studio", amount: 4250 },
-  { name: "Orbit Digital", amount: 1800 },
-  { name: "Pixel Labs", amount: 3600 },
-];
-
-const stats = [
-  { label: "This Month", value: "$5,800", icon: DollarSign, change: "+18%" },
-  { label: "Growth Rate", value: "12.5%", icon: TrendingUp, change: "vs last month" },
-  { label: "Active Clients", value: "18", icon: Users, change: "+2 new" },
-  { label: "Overdue Amount", value: "$2,400", icon: AlertCircle, change: "1 invoice" },
-];
+interface AnalyticsData {
+  revenueData: { month: string; revenue: number }[];
+  topClients: { name: string; amount: number }[];
+  thisMonthRevenue: number;
+  growthRate: string;
+  activeClients: number;
+  overdueAmount: number;
+  overdueCount: number;
+}
 
 export default function AnalyticsPage() {
+  const [data, setData] = useState<AnalyticsData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/analytics")
+      .then((res) => res.json())
+      .then((d) => {
+        setData(d);
+        setLoading(false);
+      });
+  }, []);
+
+  if (loading || !data) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 size={24} className="animate-spin text-[var(--primary)]" />
+      </div>
+    );
+  }
+
+  const stats = [
+    { label: "This Month", value: `$${data.thisMonthRevenue.toFixed(2)}`, icon: DollarSign, change: "Paid invoices" },
+    { label: "Growth Rate", value: `${data.growthRate}%`, icon: TrendingUp, change: "vs last month" },
+    { label: "Active Clients", value: String(data.activeClients), icon: Users, change: "All time" },
+    { label: "Overdue Amount", value: `$${data.overdueAmount.toFixed(2)}`, icon: AlertCircle, change: `${data.overdueCount} invoices` },
+  ];
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -76,13 +89,13 @@ export default function AnalyticsPage() {
         className="p-6 rounded-xl border border-[var(--border)] bg-[var(--card)]"
       >
         <h3 className="font-semibold text-[var(--foreground)] mb-1">Revenue Trend</h3>
-        <p className="text-sm text-[var(--muted)] mb-6">Last 7 months</p>
+        <p className="text-sm text-[var(--muted)] mb-6">Last 7 months (paid invoices)</p>
         <div className="h-72">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={revenueData}>
+            <LineChart data={data.revenueData}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
               <XAxis dataKey="month" stroke="var(--muted)" fontSize={12} />
-              <YAxis stroke="var(--muted)" fontSize={12} tickFormatter={(v) => `$${v / 1000}k`} />
+              <YAxis stroke="var(--muted)" fontSize={12} tickFormatter={(v) => `$${v}`} />
               <Tooltip
                 contentStyle={{
                   backgroundColor: "var(--card)",
@@ -90,7 +103,7 @@ export default function AnalyticsPage() {
                   borderRadius: "8px",
                   fontSize: "13px",
                 }}
-                formatter={(value) => value ? [`$${value}`, "Revenue"] : null}
+                formatter={(value) => [`$${Number(value).toFixed(2)}`, "Revenue"]}
               />
               <Line
                 type="monotone"
@@ -113,26 +126,30 @@ export default function AnalyticsPage() {
         className="p-6 rounded-xl border border-[var(--border)] bg-[var(--card)]"
       >
         <h3 className="font-semibold text-[var(--foreground)] mb-1">Top Clients by Revenue</h3>
-        <p className="text-sm text-[var(--muted)] mb-6">Total billed amount</p>
-        <div className="h-72">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={topClients} layout="vertical" margin={{ left: 20 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
-              <XAxis type="number" stroke="var(--muted)" fontSize={12} tickFormatter={(v) => `$${v / 1000}k`} />
-              <YAxis dataKey="name" type="category" stroke="var(--muted)" fontSize={12} width={90} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "var(--card)",
-                  border: "1px solid var(--border)",
-                  borderRadius: "8px",
-                  fontSize: "13px",
-                }}
-                formatter={(value) => value ? [`$${value}`, "Billed"] : null}
-              />
-              <Bar dataKey="amount" fill="var(--primary)" radius={[0, 6, 6, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+        <p className="text-sm text-[var(--muted)] mb-6">Total billed amount (all invoices)</p>
+        {data.topClients.length === 0 ? (
+          <p className="text-center py-10 text-sm text-[var(--muted)]">No invoice data yet.</p>
+        ) : (
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={data.topClients} layout="vertical" margin={{ left: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
+                <XAxis type="number" stroke="var(--muted)" fontSize={12} tickFormatter={(v) => `$${v}`} />
+                <YAxis dataKey="name" type="category" stroke="var(--muted)" fontSize={12} width={90} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "var(--card)",
+                    border: "1px solid var(--border)",
+                    borderRadius: "8px",
+                    fontSize: "13px",
+                  }}
+                  formatter={(value) => [`$${Number(value).toFixed(2)}`, "Billed"]}
+                />
+                <Bar dataKey="amount" fill="var(--primary)" radius={[0, 6, 6, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
       </motion.div>
     </div>
   );

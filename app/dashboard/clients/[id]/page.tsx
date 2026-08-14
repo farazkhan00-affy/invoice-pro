@@ -1,23 +1,32 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Mail, Phone, MapPin, Plus, FileText } from "lucide-react";
+import { ArrowLeft, Mail, Phone, MapPin, Plus, FileText, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 
-const clients = [
-  { id: 1, name: "Acme Corp", email: "hello@acme.com", phone: "+1 555-0101", address: "12 Market St, New York", initials: "AC" },
-  { id: 2, name: "Bright Studio", email: "contact@brightstudio.com", phone: "+1 555-0102", address: "45 Design Ave, LA", initials: "BS" },
-  { id: 3, name: "Nova Tech", email: "billing@novatech.io", phone: "+1 555-0103", address: "8 Innovation Rd, Austin", initials: "NT" },
-  { id: 4, name: "Pixel Labs", email: "finance@pixellabs.com", phone: "+1 555-0104", address: "21 Creative Blvd, Seattle", initials: "PL" },
-  { id: 5, name: "Orbit Digital", email: "team@orbitdigital.com", phone: "+1 555-0105", address: "3 Orbit Lane, Miami", initials: "OD" },
-];
+interface InvoiceItem {
+  qty: number;
+  rate: number;
+}
 
-const invoiceHistory = [
-  { id: "INV-0047", amount: "$1,200", status: "Paid", date: "Aug 8, 2026" },
-  { id: "INV-0038", amount: "$900", status: "Paid", date: "Jul 2, 2026" },
-  { id: "INV-0029", amount: "$1,500", status: "Paid", date: "Jun 5, 2026" },
-];
+interface Invoice {
+  id: string;
+  number: string;
+  status: string;
+  createdAt: string;
+  items: InvoiceItem[];
+}
+
+interface Client {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  address: string | null;
+  invoices: Invoice[];
+}
 
 const statusStyles: Record<string, string> = {
   Paid: "bg-green-500/10 text-green-500",
@@ -27,9 +36,40 @@ const statusStyles: Record<string, string> = {
 
 export default function ClientDetailPage() {
   const params = useParams();
-  const client = clients.find((c) => c.id === Number(params.id));
+  const [client, setClient] = useState<Client | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
 
-  if (!client) {
+  useEffect(() => {
+    fetch(`/api/clients/${params.id}`)
+      .then((res) => {
+        if (!res.ok) {
+          setNotFound(true);
+          return null;
+        }
+        return res.json();
+      })
+      .then((data) => {
+        if (data) setClient(data);
+        setLoading(false);
+      });
+  }, [params.id]);
+
+  const getInitials = (name: string) =>
+    name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
+
+  const invoiceTotal = (invoice: Invoice) =>
+    invoice.items.reduce((sum, item) => sum + item.qty * item.rate, 0);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 size={24} className="animate-spin text-[var(--primary)]" />
+      </div>
+    );
+  }
+
+  if (notFound || !client) {
     return (
       <div className="text-center py-20 text-[var(--muted)]">
         Client not found.
@@ -62,11 +102,10 @@ export default function ClientDetailPage() {
       >
         <div className="flex items-center gap-4">
           <div className="w-14 h-14 rounded-full bg-[var(--primary)]/10 flex items-center justify-center text-[var(--primary)] font-semibold text-lg">
-            {client.initials}
+            {getInitials(client.name)}
           </div>
           <div>
             <h2 className="font-semibold text-lg text-[var(--foreground)]">{client.name}</h2>
-            <p className="text-sm text-[var(--muted)]">Client since Jan 2026</p>
           </div>
         </div>
 
@@ -75,14 +114,18 @@ export default function ClientDetailPage() {
             <Mail size={15} />
             {client.email}
           </div>
-          <div className="flex items-center gap-2 text-sm text-[var(--muted)]">
-            <Phone size={15} />
-            {client.phone}
-          </div>
-          <div className="flex items-center gap-2 text-sm text-[var(--muted)]">
-            <MapPin size={15} />
-            {client.address}
-          </div>
+          {client.phone && (
+            <div className="flex items-center gap-2 text-sm text-[var(--muted)]">
+              <Phone size={15} />
+              {client.phone}
+            </div>
+          )}
+          {client.address && (
+            <div className="flex items-center gap-2 text-sm text-[var(--muted)]">
+              <MapPin size={15} />
+              {client.address}
+            </div>
+          )}
         </div>
       </motion.div>
 
@@ -104,19 +147,21 @@ export default function ClientDetailPage() {
           </Link>
         </div>
 
-        {invoiceHistory.length > 0 ? (
+        {client.invoices.length > 0 ? (
           <div className="divide-y divide-[var(--border)]">
-            {invoiceHistory.map((inv) => (
+            {client.invoices.map((inv) => (
               <div key={inv.id} className="flex items-center justify-between px-5 py-3.5">
                 <div className="flex items-center gap-3">
                   <FileText size={16} className="text-[var(--muted)]" />
                   <div>
-                    <p className="text-sm font-medium text-[var(--foreground)]">{inv.id}</p>
-                    <p className="text-xs text-[var(--muted)]">{inv.date}</p>
+                    <p className="text-sm font-medium text-[var(--foreground)]">{inv.number}</p>
+                    <p className="text-xs text-[var(--muted)]">
+                      {new Date(inv.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-sm font-medium text-[var(--foreground)]">{inv.amount}</span>
+                  <span className="text-sm font-medium text-[var(--foreground)]">${invoiceTotal(inv).toFixed(2)}</span>
                   <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusStyles[inv.status]}`}>
                     {inv.status}
                   </span>

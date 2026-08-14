@@ -1,12 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-
-const clients = ["Acme Corp", "Bright Studio", "Nova Tech", "Pixel Labs", "Orbit Digital"];
 
 interface LineItem {
   id: number;
@@ -15,14 +13,28 @@ interface LineItem {
   rate: number;
 }
 
+interface Client {
+  id: string;
+  name: string;
+}
+
 export default function NewInvoicePage() {
   const router = useRouter();
-  const [client, setClient] = useState("");
+  const [clients, setClients] = useState<Client[]>([]);
+  const [clientId, setClientId] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [taxRate, setTaxRate] = useState(0);
   const [items, setItems] = useState<LineItem[]>([
     { id: 1, description: "", qty: 1, rate: 0 },
   ]);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/clients")
+      .then((res) => res.json())
+      .then((data) => setClients(Array.isArray(data) ? data : []));
+  }, []);
 
   const addItem = () => {
     setItems((prev) => [...prev, { id: Date.now(), description: "", qty: 1, rate: 0 }]);
@@ -42,10 +54,32 @@ export default function NewInvoicePage() {
   const taxAmount = (subtotal * taxRate) / 100;
   const total = subtotal + taxAmount;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: connect to backend once database is set up
+    setError("");
+    setLoading(true);
+
+    const res = await fetch("/api/invoices", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        clientId,
+        dueDate,
+        taxRate,
+        items: items.map(({ description, qty, rate }) => ({ description, qty, rate })),
+      }),
+    });
+
+    setLoading(false);
+
+    if (!res.ok) {
+      const data = await res.json();
+      setError(data.error || "Something went wrong");
+      return;
+    }
+
     router.push("/dashboard/invoices");
+    router.refresh();
   };
 
   return (
@@ -77,15 +111,20 @@ export default function NewInvoicePage() {
             <label className="text-sm text-[var(--foreground)] mb-1.5 block">Client</label>
             <select
               required
-              value={client}
-              onChange={(e) => setClient(e.target.value)}
+              value={clientId}
+              onChange={(e) => setClientId(e.target.value)}
               className="w-full px-4 py-2.5 rounded-lg border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40 transition-all"
             >
               <option value="">Select a client</option>
               {clients.map((c) => (
-                <option key={c} value={c}>{c}</option>
+                <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
+            {clients.length === 0 && (
+              <p className="text-xs text-[var(--muted)] mt-1.5">
+                No clients yet. <Link href="/dashboard/clients/new" className="text-[var(--primary)] hover:underline">Add one first</Link>.
+              </p>
+            )}
           </div>
           <div>
             <label className="text-sm text-[var(--foreground)] mb-1.5 block">Due date</label>
@@ -190,13 +229,18 @@ export default function NewInvoicePage() {
           </div>
         </div>
 
+        {error && (
+          <p className="text-sm text-red-500 bg-red-500/10 px-3 py-2 rounded-lg">{error}</p>
+        )}
+
         {/* Actions */}
         <div className="flex items-center gap-3">
           <button
             type="submit"
-            className="flex-1 sm:flex-none sm:px-8 bg-[var(--primary)] text-white py-2.5 rounded-lg font-medium hover:opacity-90 transition-opacity"
+            disabled={loading}
+            className="flex-1 sm:flex-none sm:px-8 bg-[var(--primary)] text-white py-2.5 rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-60"
           >
-            Create Invoice
+            {loading ? "Creating..." : "Create Invoice"}
           </button>
           <Link
             href="/dashboard/invoices"

@@ -2,12 +2,27 @@
 
 import { Menu, Search, Bell } from "lucide-react";
 import { ThemeToggle } from "./theme-toggle";
+import { useSession } from "next-auth/react";
+import Image from "next/image";
 
 interface TopbarProps {
   onMenuClick: () => void;
 }
 
 export function Topbar({ onMenuClick }: TopbarProps) {
+  const { data: session } = useSession();
+
+  const initials = session?.user?.name
+    ? session.user.name
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2)
+    : "?";
+
+  const avatarUrl = session?.user?.avatarUrl;
+
   return (
     <header className="sticky top-0 z-30 flex items-center justify-between gap-4 px-4 md:px-6 py-4 border-b border-[var(--border)] bg-[var(--background)]/80 backdrop-blur-lg">
       {/* Mobile menu button */}
@@ -32,8 +47,12 @@ export function Topbar({ onMenuClick }: TopbarProps) {
           <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-[var(--primary)]" />
         </button>
         <ThemeToggle />
-        <div className="w-8 h-8 rounded-full bg-[var(--primary)] flex items-center justify-center text-white text-xs font-semibold">
-          FH
+        <div className="w-8 h-8 rounded-full bg-[var(--primary)] flex items-center justify-center text-white text-xs font-semibold overflow-hidden relative">
+          {avatarUrl ? (
+            <Image src={avatarUrl} alt="Avatar" fill className="object-cover" />
+          ) : (
+            initials
+          )}
         </div>
       </div>
     </header>

@@ -15,15 +15,34 @@ export default function NewClientPage() {
     address: "",
     notes: "",
   });
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (field: string, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: connect to backend once database is set up
+    setError("");
+    setLoading(true);
+
+    const res = await fetch("/api/clients", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(form),
+    });
+
+    setLoading(false);
+
+    if (!res.ok) {
+      const data = await res.json();
+      setError(data.error || "Something went wrong");
+      return;
+    }
+
     router.push("/dashboard/clients");
+    router.refresh();
   };
 
   return (
@@ -127,13 +146,18 @@ export default function NewClientPage() {
           </div>
         </div>
 
+        {error && (
+          <p className="text-sm text-red-500 bg-red-500/10 px-3 py-2 rounded-lg">{error}</p>
+        )}
+
         {/* Actions */}
         <div className="flex items-center gap-3 pt-2">
           <button
             type="submit"
-            className="flex-1 bg-[var(--primary)] text-white py-2.5 rounded-lg font-medium hover:opacity-90 transition-opacity"
+            disabled={loading}
+            className="flex-1 bg-[var(--primary)] text-white py-2.5 rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-60"
           >
-            Save Client
+            {loading ? "Saving..." : "Save Client"}
           </button>
           <Link
             href="/dashboard/clients"

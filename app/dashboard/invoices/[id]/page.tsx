@@ -1,37 +1,33 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Download, Mail, FileText } from "lucide-react";
+import { ArrowLeft, Download, Mail, FileText, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { PDFDownloadLink } from "@react-pdf/renderer";
+import { InvoicePdf } from "@/app/components/invoice-pdf";
 
-const invoices = [
-  {
-    id: "INV-0047",
-    client: "Acme Corp",
-    clientEmail: "hello@acme.com",
-    clientAddress: "12 Market St, New York",
-    status: "Paid",
-    date: "Aug 8, 2026",
-    dueDate: "Aug 22, 2026",
-    items: [
-      { description: "Website redesign", qty: 1, rate: 800 },
-      { description: "Logo design", qty: 1, rate: 400 },
-    ],
-    taxRate: 0,
-  },
-  {
-    id: "INV-0046",
-    client: "Bright Studio",
-    clientEmail: "contact@brightstudio.com",
-    clientAddress: "45 Design Ave, LA",
-    status: "Pending",
-    date: "Aug 6, 2026",
-    dueDate: "Aug 20, 2026",
-    items: [{ description: "Brand consultation", qty: 5, rate: 170 }],
-    taxRate: 5,
-  },
-];
+interface InvoiceItem {
+  description: string;
+  qty: number;
+  rate: number;
+}
+
+interface Invoice {
+  id: string;
+  number: string;
+  status: string;
+  createdAt: string;
+  dueDate: string;
+  taxRate: number;
+  items: InvoiceItem[];
+  client: {
+    name: string;
+    email: string;
+    address: string | null;
+  };
+}
 
 const statusStyles: Record<string, string> = {
   Paid: "bg-green-500/10 text-green-500",
@@ -41,7 +37,48 @@ const statusStyles: Record<string, string> = {
 
 export default function InvoiceDetailPage() {
   const params = useParams();
-  const invoice = invoices.find((inv) => inv.id === params.id) ?? invoices[0];
+  const [invoice, setInvoice] = useState<Invoice | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState(false);
+
+  useEffect(() => {
+    fetch(`/api/invoices/${params.id}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setInvoice(data);
+        setLoading(false);
+      });
+  }, [params.id]);
+
+  const updateStatus = async (status: string) => {
+    setUpdating(true);
+    await fetch(`/api/invoices/${params.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    setInvoice((prev) => (prev ? { ...prev, status } : prev));
+    setUpdating(false);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 size={24} className="animate-spin text-[var(--primary)]" />
+      </div>
+    );
+  }
+
+  if (!invoice) {
+    return (
+      <div className="text-center py-20 text-[var(--muted)]">
+        Invoice not found.
+        <Link href="/dashboard/invoices" className="block mt-2 text-[var(--primary)] hover:underline">
+          Back to invoices
+        </Link>
+      </div>
+    );
+  }
 
   const subtotal = invoice.items.reduce((sum, item) => sum + item.qty * item.rate, 0);
   const taxAmount = (subtotal * invoice.taxRate) / 100;
@@ -59,7 +96,7 @@ export default function InvoiceDetailPage() {
             <ArrowLeft size={16} />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-[var(--foreground)]">{invoice.id}</h1>
+            <h1 className="text-2xl font-bold text-[var(--foreground)]">{invoice.number}</h1>
             <p className="text-sm text-[var(--muted)] mt-0.5">Invoice details</p>
           </div>
         </div>
@@ -68,10 +105,14 @@ export default function InvoiceDetailPage() {
             <Mail size={15} />
             Email
           </button>
-          <button className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[var(--primary)] text-white text-sm font-medium hover:opacity-90 transition-opacity">
+          <PDFDownloadLink
+            document={<InvoicePdf {...invoice} />}
+            fileName={`${invoice.number}.pdf`}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[var(--primary)] text-white text-sm font-medium hover:opacity-90 transition-opacity"
+          >
             <Download size={15} />
             Download PDF
-          </button>
+          </PDFDownloadLink>
         </div>
       </div>
 
@@ -93,27 +134,43 @@ export default function InvoiceDetailPage() {
               <span className="text-[var(--primary)]">Pro</span>
             </span>
           </div>
-          <span className={`px-3 py-1.5 rounded-full text-sm font-medium ${statusStyles[invoice.status]}`}>
-            {invoice.status}
-          </span>
+          <div className="flex items-center gap-2">
+            {updating && <Loader2 size={14} className="animate-spin text-[var(--muted)]" />}
+            <select
+              value={invoice.status}
+              onChange={(e) => updateStatus(e.target.value)}
+              disabled={updating}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40 disabled:opacity-60 ${statusStyles[invoice.status]}`}
+            >
+              <option value="Pending">Pending</option>
+              <option value="Paid">Paid</option>
+              <option value="Overdue">Overdue</option>
+            </select>
+          </div>
         </div>
 
         {/* Bill to / dates */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8 pb-8 border-b border-[var(--border)]">
           <div>
             <p className="text-xs text-[var(--muted)] mb-1.5">Billed to</p>
-            <p className="font-semibold text-[var(--foreground)]">{invoice.client}</p>
-            <p className="text-sm text-[var(--muted)]">{invoice.clientEmail}</p>
-            <p className="text-sm text-[var(--muted)]">{invoice.clientAddress}</p>
+            <p className="font-semibold text-[var(--foreground)]">{invoice.client.name}</p>
+            <p className="text-sm text-[var(--muted)]">{invoice.client.email}</p>
+            {invoice.client.address && (
+              <p className="text-sm text-[var(--muted)]">{invoice.client.address}</p>
+            )}
           </div>
           <div className="sm:text-right">
             <div className="flex sm:justify-end gap-2 text-sm mb-1">
               <span className="text-[var(--muted)]">Issued:</span>
-              <span className="text-[var(--foreground)]">{invoice.date}</span>
+              <span className="text-[var(--foreground)]">
+                {new Date(invoice.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+              </span>
             </div>
             <div className="flex sm:justify-end gap-2 text-sm">
               <span className="text-[var(--muted)]">Due:</span>
-              <span className="text-[var(--foreground)]">{invoice.dueDate}</span>
+              <span className="text-[var(--foreground)]">
+                {new Date(invoice.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+              </span>
             </div>
           </div>
         </div>

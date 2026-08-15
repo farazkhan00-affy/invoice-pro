@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/app/lib/prisma";
 import { auth } from "@/app/lib/auth";
+import { createNotification } from "@/app/lib/notifications";
 
 export async function GET() {
   const session = await auth();
@@ -35,7 +36,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // Generate next invoice number
     const count = await prisma.invoice.count({
       where: { userId: session.user.id },
     });
@@ -58,6 +58,8 @@ export async function POST(req: Request) {
       },
       include: { items: true, client: true },
     });
+
+    await createNotification(session.user.id, `Invoice ${invoice.number} created for ${invoice.client.name}`);
 
     return NextResponse.json(invoice, { status: 201 });
   } catch (error) {

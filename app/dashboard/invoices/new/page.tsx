@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, ChevronDown, Check } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { DatePicker } from "@/app/components/date-picker";
 
 interface LineItem {
   id: number;
@@ -22,6 +23,8 @@ export default function NewInvoicePage() {
   const router = useRouter();
   const [clients, setClients] = useState<Client[]>([]);
   const [clientId, setClientId] = useState("");
+  const [clientDropdownOpen, setClientDropdownOpen] = useState(false);
+  const clientDropdownRef = useRef<HTMLDivElement>(null);
   const [dueDate, setDueDate] = useState("");
   const [taxRate, setTaxRate] = useState(0);
   const [items, setItems] = useState<LineItem[]>([
@@ -35,6 +38,18 @@ export default function NewInvoicePage() {
       .then((res) => res.json())
       .then((data) => setClients(Array.isArray(data) ? data : []));
   }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (clientDropdownRef.current && !clientDropdownRef.current.contains(e.target as Node)) {
+        setClientDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const selectedClientName = clients.find((c) => c.id === clientId)?.name ?? "";
 
   const addItem = () => {
     setItems((prev) => [...prev, { id: Date.now(), description: "", qty: 1, rate: 0 }]);
@@ -57,6 +72,12 @@ export default function NewInvoicePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    if (!clientId) {
+      setError("Please select a client");
+      return;
+    }
+
     setLoading(true);
 
     const res = await fetch("/api/invoices", {
@@ -109,33 +130,52 @@ export default function NewInvoicePage() {
         <div className="p-6 rounded-xl border border-[var(--border)] bg-[var(--card)] grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="text-sm text-[var(--foreground)] mb-1.5 block">Client</label>
-            <select
-              required
-              value={clientId}
-              onChange={(e) => setClientId(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-lg border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40 transition-all"
-            >
-              <option value="">Select a client</option>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-            {clients.length === 0 && (
-              <p className="text-xs text-[var(--muted)] mt-1.5">
-                No clients yet. <Link href="/dashboard/clients/new" className="text-[var(--primary)] hover:underline">Add one first</Link>.
-              </p>
-            )}
+            <div className="relative" ref={clientDropdownRef}>
+              <button
+                type="button"
+                onClick={() => setClientDropdownOpen((prev) => !prev)}
+                className="w-full flex items-center justify-between px-4 py-2.5 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm text-left focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40 transition-all"
+              >
+                <span className={selectedClientName ? "text-[var(--foreground)]" : "text-[var(--muted)]"}>
+                  {selectedClientName || "Select a client"}
+                </span>
+                <ChevronDown size={16} className="text-[var(--muted)] shrink-0" />
+              </button>
+
+              {clientDropdownOpen && (
+                <div className="absolute left-0 right-0 top-full mt-1.5 max-h-60 overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--card)] shadow-lg z-50">
+                  {clients.length === 0 ? (
+                    <p className="px-4 py-3 text-sm text-[var(--muted)]">
+                      No clients yet.{" "}
+                      <Link href="/dashboard/clients/new" className="text-[var(--primary)] hover:underline">
+                        Add one first
+                      </Link>
+                      .
+                    </p>
+                  ) : (
+                    clients.map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => {
+                          setClientId(c.id);
+                          setClientDropdownOpen(false);
+                        }}
+                        className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-left text-[var(--foreground)] hover:bg-[var(--border)]/30 transition-colors"
+                      >
+                        {c.name}
+                        {clientId === c.id && <Check size={14} className="text-[var(--primary)]" />}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
           </div>
           <div>
-            <label className="text-sm text-[var(--foreground)] mb-1.5 block">Due date</label>
-            <input
-              type="date"
-              required
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-lg border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40 transition-all"
-            />
-          </div>
+  <label className="text-sm text-[var(--foreground)] mb-1.5 block">Due date</label>
+  <DatePicker value={dueDate} onChange={setDueDate} required />
+</div>
         </div>
 
         {/* Line items */}

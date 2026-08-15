@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/app/lib/prisma";
 import { auth } from "@/app/lib/auth";
+import { createNotification } from "@/app/lib/notifications";
 
 export async function GET(
   req: Request,
@@ -37,10 +38,18 @@ export async function PATCH(
   const { id } = await params;
   const { status } = await req.json();
 
+  const existing = await prisma.invoice.findFirst({
+    where: { id, userId: session.user.id },
+  });
+
   const invoice = await prisma.invoice.updateMany({
     where: { id, userId: session.user.id },
     data: { status },
   });
+
+  if (existing && status === "Paid" && existing.status !== "Paid") {
+    await createNotification(session.user.id, `Invoice ${existing.number} marked as paid`);
+  }
 
   return NextResponse.json(invoice);
 }

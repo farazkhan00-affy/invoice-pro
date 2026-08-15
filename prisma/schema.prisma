@@ -3,23 +3,24 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model User {
-  id              String    @id @default(cuid())
+  id              String         @id @default(cuid())
   name            String
-  email           String    @unique
+  email           String         @unique
   password        String?
   businessName    String?
   businessAddress String?
-  currency        String?   @default("USD")
-  taxRate         Float?    @default(0)
+  currency        String?        @default("USD")
+  taxRate         Float?         @default(0)
   avatarUrl       String?
-  createdAt       DateTime  @default(now())
+  createdAt       DateTime       @default(now())
   clients         Client[]
   invoices        Invoice[]
+  notifications   Notification[]
 }
 
 model Client {
@@ -56,4 +57,13 @@ model InvoiceItem {
   rate        Float
   invoiceId   String
   invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

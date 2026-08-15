@@ -40,6 +40,8 @@ export default function InvoiceDetailPage() {
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
 
   useEffect(() => {
     fetch(`/api/invoices/${params.id}`)
@@ -59,6 +61,22 @@ export default function InvoiceDetailPage() {
     });
     setInvoice((prev) => (prev ? { ...prev, status } : prev));
     setUpdating(false);
+  };
+
+  const sendEmail = async () => {
+    setSendingEmail(true);
+    const res = await fetch("/api/send-invoice", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ invoiceId: params.id }),
+    });
+    setSendingEmail(false);
+    if (res.ok) {
+      setEmailSent(true);
+      setTimeout(() => setEmailSent(false), 3000);
+    } else {
+      alert("Failed to send email. Please try again.");
+    }
   };
 
   if (loading) {
@@ -101,9 +119,13 @@ export default function InvoiceDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-[var(--border)] text-sm font-medium text-[var(--foreground)] hover:bg-[var(--border)]/30 transition-colors">
+          <button
+            onClick={sendEmail}
+            disabled={sendingEmail}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-[var(--border)] text-sm font-medium text-[var(--foreground)] hover:bg-[var(--border)]/30 transition-colors disabled:opacity-60"
+          >
             <Mail size={15} />
-            Email
+            {sendingEmail ? "Sending..." : emailSent ? "Sent!" : "Email"}
           </button>
           <PDFDownloadLink
             document={<InvoicePdf {...invoice} />}
